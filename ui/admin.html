@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Claude Notifs</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --fg: #1c1c1f; --muted: #6b6b75; --border: #e4e2dc;
+    --accent: #d97757; --accent-fg: #ffffff; --ok: #2ea043; --bad: #e5533d; --input: #faf9f7;
+    --hover: rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #18181b; --panel: #222226; --fg: #f3f3f5; --muted: #a2a2ad; --border: #34343a;
+      --input: #1b1b1f; --hover: rgba(255,255,255,.05);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 24px 40px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  .logo { width: 42px; height: 42px; border-radius: 12px; background: var(--accent); display: grid; place-items: center; color: #fff; flex: none; }
+  h1 { font-size: 20px; margin: 0; font-weight: 650; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .pill { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 99px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--panel); white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.ok .dot { background: var(--ok); } .pill.bad .dot { background: var(--bad); }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 4px; font-weight: 650; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  button { font: inherit; font-size: 13px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--fg); padding: 6px 12px; cursor: pointer; }
+  button:hover { background: var(--hover); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  button.primary:hover { filter: brightness(1.06); }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=number], input[type=text] { font: inherit; font-size: 13px; color: var(--fg); background: var(--input); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Position */
+  .pos-wrap { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+  .screen { position: relative; width: 240px; height: 150px; border: 2px solid var(--border); border-radius: 10px; background: var(--input); flex: none; }
+  .screen::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: var(--border); border-radius: 0 0 8px 8px; }
+  .corner { position: absolute; width: 74px; height: 26px; border-radius: 6px; border: 1.5px dashed var(--muted); background: transparent; padding: 0; opacity: .55; }
+  .corner:hover { opacity: 1; background: var(--hover); }
+  .corner.on { border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); opacity: 1; }
+  .corner[data-pos=top_left] { top: 8px; left: 8px; } .corner[data-pos=top_right] { top: 8px; right: 8px; }
+  .corner[data-pos=bottom_left] { bottom: 22px; left: 8px; } .corner[data-pos=bottom_right] { bottom: 22px; right: 8px; }
+  .pos-side { display: flex; flex-direction: column; gap: 10px; }
+  .pos-name { font-weight: 600; }
+
+  /* Types */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 0 8px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  tr.off td:not(:first-child) { opacity: .45; }
+  td.label input { width: 100%; min-width: 150px; }
+  .src { font-size: 11.5px; color: var(--muted); margin-top: 2px; font-family: "Cascadia Mono", Consolas, monospace; }
+  .dur { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .dur input { width: 64px; }
+  .dur span { color: var(--muted); font-size: 12px; }
+  input[type=color] { width: 34px; height: 28px; border: 1px solid var(--border); border-radius: 7px; padding: 2px; background: var(--input); cursor: pointer; }
+
+  /* Interrupteur */
+  .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--border); transition: .15s; cursor: pointer; }
+  .switch span::before { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::before { transform: translateX(16px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .row { display: flex; align-items: center; gap: 12px; padding: 9px 0; }
+  .row + .row { border-top: 1px solid var(--border); }
+  .row .txt { flex: 1; }
+  .row .txt small { display: block; color: var(--muted); font-size: 12.5px; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 13px; margin-bottom: 14px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; word-break: break-all; }
+  code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; background: var(--input); border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .msg { margin-top: 12px; font-size: 13px; padding: 8px 12px; border-radius: 8px; display: none; }
+  .msg.show { display: block; }
+  .msg.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+  .msg.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); }
+  .saved { position: fixed; bottom: 16px; right: 16px; background: var(--fg); color: var(--bg); padding: 6px 12px; border-radius: 8px; font-size: 12.5px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .saved.show { opacity: .92; }
+  @media (max-width: 640px) {
+    main { padding: 16px; }
+    .hide-sm { display: none; }
+    .pill { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></div>
+    <div>
+      <h1>Claude Notifs</h1>
+      <p>Notifications Windows pour Claude Code</p>
+    </div>
+    <span class="pill" id="pill"><span class="dot"></span><span id="pill-txt">…</span></span>
+  </header>
+
+  <section>
+    <h2>Position des notifications</h2>
+    <p class="sub">Coin de l'écran où les notifications apparaissent. Elles s'empilent à partir de ce coin.</p>
+    <div class="pos-wrap">
+      <div class="screen" id="screen">
+        <button class="corner" data-pos="top_left" title="Haut gauche" aria-label="Haut gauche"></button>
+        <button class="corner" data-pos="top_right" title="Haut droite" aria-label="Haut droite"></button>
+        <button class="corner" data-pos="bottom_left" title="Bas gauche" aria-label="Bas gauche"></button>
+        <button class="corner" data-pos="bottom_right" title="Bas droite" aria-label="Bas droite"></button>
+      </div>
+      <div class="pos-side">
+        <div>Position actuelle : <span class="pos-name" id="pos-name"></span></div>
+        <div class="dur">Au maximum <input type="number" id="max-visible" min="1" max="10"> <span>notifications visibles en même temps</span></div>
+        <div><button id="test-all">Tester toutes les notifications</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Types de notifications</h2>
+    <p class="sub">Pour chaque raison : activer ou non, libellé affiché, durée d'affichage (0 = reste affichée jusqu'au clic), couleur, son d'alerte (son « Notification » de Windows) et clignotement.</p>
+    <table>
+      <thead><tr><th>Actif</th><th>Raison</th><th>Durée</th><th>Couleur</th><th title="Joue un son d'alerte à l'affichage">Son</th><th title="La notification clignote tant qu'elle est affichée">Clignote</th><th></th></tr></thead>
+      <tbody id="types"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Liaison Claude Code</h2>
+    <p class="sub">Ajoute les hooks de claude-notifs dans <code>~/.claude/settings.json</code>. Tes autres hooks ne sont jamais modifiés, et une sauvegarde est faite avant chaque écriture. Les nouvelles sessions Claude Code prennent la liaison en compte.</p>
+    <dl class="kv">
+      <dt>État</dt><dd id="hooks-state">…</dd>
+      <dt>Dernier événement</dt><dd id="last-event">aucun pour l'instant</dd>
+      <dt>Fichier</dt><dd><code id="settings-path"></code></dd>
+      <dt>Exécutable</dt><dd><code id="exe-path"></code></dd>
+      <dt>Écoute</dt><dd><code id="listen"></code></dd>
+    </dl>
+    <div class="actions">
+      <button class="primary" id="install">Installer la liaison</button>
+      <button class="danger" id="uninstall">Retirer la liaison</button>
+    </div>
+    <div class="msg" id="hooks-msg"></div>
+  </section>
+
+  <section>
+    <h2>Général</h2>
+    <div class="row">
+      <div class="txt">Démarrer avec Windows<small>Lance claude-notifs en arrière-plan à l'ouverture de session.</small></div>
+      <label class="switch"><input type="checkbox" id="autostart"><span></span></label>
+    </div>
+    <div class="row">
+      <div class="txt">Ne pas déranger<small>Plus aucune notification ne s'affiche (les tests restent possibles).</small></div>
+      <label class="switch"><input type="checkbox" id="dnd"><span></span></label>
+    </div>
+  </section>
+</main>
+<div class="saved" id="saved">Enregistré</div>
+
+<script>
+const POS_NAMES = { top_left: 'haut gauche', top_right: 'haut droite', bottom_left: 'bas gauche', bottom_right: 'bas droite' };
+const SOURCES = {
+  question: 'PreToolUse · AskUserQuestion',
+  plan: 'PreToolUse · ExitPlanMode',
+  permission: 'Notification · permission_prompt',
+  idle: 'Notification · idle_prompt',
+  prompt_end: 'Stop',
+  prompt_start: 'UserPromptSubmit',
+  subagent_end: 'SubagentStop',
+  session_start: 'SessionStart',
+  session_end: 'SessionEnd',
+  notification: 'Notification · autres',
+};
+const $ = (id) => document.getElementById(id);
+const send = (msg) => window.ipc.postMessage(JSON.stringify(msg));
+let state = null;
+let saveTimer = null;
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => send({ cmd: 'save', config: state.config }), 250);
+}
+
+function renderTypes() {
+  const tbody = $('types');
+  tbody.textContent = '';
+  for (const t of state.config.types) {
+    const tr = document.createElement('tr');
+    tr.className = t.enabled ? '' : 'off';
+    tr.innerHTML = `
+      <td><label class="switch"><input type="checkbox" data-f="enabled"><span></span></label></td>
+      <td class="label"><input type="text" data-f="label" maxlength="40"><div class="src hide-sm"></div></td>
+      <td><div class="dur"><input type="number" data-f="duration" min="0" max="600"><span>s</span></div></td>
+      <td><input type="color" data-f="color"></td>
+      <td><label class="switch" title="Son d'alerte"><input type="checkbox" data-f="sound"><span></span></label></td>
+      <td><label class="switch" title="Clignotement"><input type="checkbox" data-f="blink"><span></span></label></td>
+      <td><button data-test>Tester</button></td>`;
+    const q = (sel) => tr.querySelector(sel);
+    q('[data-f=enabled]').checked = t.enabled;
+    q('[data-f=label]').value = t.label;
+    q('.src').textContent = SOURCES[t.key] || t.key;
+    q('[data-f=duration]').value = t.duration;
+    q('[data-f=color]').value = t.color;
+    q('[data-f=sound]').checked = t.sound;
+    q('[data-f=blink]').checked = t.blink;
+    q('[data-f=sound]').addEventListener('change', (e) => { t.sound = e.target.checked; scheduleSave(); });
+    q('[data-f=blink]').addEventListener('change', (e) => { t.blink = e.target.checked; scheduleSave(); });
+    q('[data-f=enabled]').addEventListener('change', (e) => { t.enabled = e.target.checked; tr.className = t.enabled ? '' : 'off'; scheduleSave(); });
+    q('[data-f=label]').addEventListener('input', (e) => { t.label = e.target.value; scheduleSave(); });
+    q('[data-f=duration]').addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      if (!Number.isNaN(v) && v >= 0) { t.duration = Math.min(v, 600); scheduleSave(); }
+    });
+    q('[data-f=color]').addEventListener('input', (e) => { t.color = e.target.value; scheduleSave(); });
+    q('[data-test]').addEventListener('click', () => send({ cmd: 'test', kind: t.key }));
+    tbody.appendChild(tr);
+  }
+}
+
+function renderPosition() {
+  for (const b of document.querySelectorAll('.corner')) b.classList.toggle('on', b.dataset.pos === state.config.position);
+  $('pos-name').textContent = POS_NAMES[state.config.position];
+}
+
+function renderLink() {
+  const ok = state.hooks_installed;
+  $('pill').className = 'pill ' + (ok ? 'ok' : 'bad');
+  $('pill-txt').textContent = ok ? 'Liaison active' : 'Liaison non installée';
+  $('hooks-state').textContent = ok ? 'Hooks installés' : 'Hooks non installés';
+  $('install').textContent = ok ? 'Réinstaller la liaison' : 'Installer la liaison';
+  $('uninstall').disabled = !ok;
+  $('last-event').textContent = state.last_event || "aucun pour l'instant";
+  $('settings-path').textContent = state.settings_path;
+  $('exe-path').textContent = state.exe_path;
+  $('listen').textContent = 'http://127.0.0.1:' + state.port;
+}
+
+// Appelé par Rust avec l'état complet.
+window.onState = (s) => {
+  const first = !state;
+  state = s;
+  if (first) {
+    renderTypes();
+    $('max-visible').value = state.config.max_visible;
+  }
+  renderPosition();
+  renderLink();
+  $('autostart').checked = state.autostart;
+  $('dnd').checked = state.config.dnd;
+};
+
+// Appelé par Rust après une action.
+window.onMessage = (text, ok) => {
+  const m = $('hooks-msg');
+  m.textContent = text;
+  m.className = 'msg show ' + (ok ? 'ok' : 'bad');
+};
+
+window.onSaved = () => {
+  const s = $('saved');
+  s.classList.add('show');
+  clearTimeout(s._t);
+  s._t = setTimeout(() => s.classList.remove('show'), 1200);
+};
+
+for (const b of document.querySelectorAll('.corner')) {
+  b.addEventListener('click', () => {
+    state.config.position = b.dataset.pos;
+    renderPosition();
+    send({ cmd: 'save', config: state.config });
+    send({ cmd: 'test', kind: 'notification' });
+  });
+}
+$('max-visible').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value, 10);
+  if (v >= 1 && v <= 10) { state.config.max_visible = v; scheduleSave(); }
+});
+$('test-all').addEventListener('click', () => send({ cmd: 'test_all' }));
+$('install').addEventListener('click', () => send({ cmd: 'install_hooks' }));
+$('uninstall').addEventListener('click', () => send({ cmd: 'uninstall_hooks' }));
+$('autostart').addEventListener('change', (e) => send({ cmd: 'autostart', enabled: e.target.checked }));
+$('dnd').addEventListener('change', (e) => { state.config.dnd = e.target.checked; send({ cmd: 'save', config: state.config }); });
+
+send({ cmd: 'ready' });
+</script>
+</body>
+</html>

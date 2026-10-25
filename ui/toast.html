@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1c1c1f; --muted: #6b6b75; --border: rgba(0,0,0,.08);
+    --chip: rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #232328; --fg: #f3f3f5; --muted: #a2a2ad; --border: rgba(255,255,255,.08); --chip: rgba(255,255,255,.08); }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+  body { font: 13px/1.35 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--fg); padding: 4px; cursor: pointer; }
+  html, body { height: auto; }
+  .card {
+    position: relative; display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 34px 12px 16px; border-radius: 10px; background: var(--bg);
+    border: 1px solid var(--border); overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,.18);
+    animation: enter .28s cubic-bezier(.2,.9,.3,1.2) both;
+  }
+  .card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--accent); }
+  .card.blink { animation: enter .28s cubic-bezier(.2,.9,.3,1.2) both, blink 1.1s ease-in-out .3s infinite; }
+  .card.blink .icon { animation: pulse 1.1s ease-in-out .3s infinite; }
+  .card.leaving { animation: leave .22s ease-in forwards; }
+  @keyframes blink {
+    0%, 100% { border-color: var(--border); background: var(--bg); }
+    50% { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--bg)); }
+  }
+  @keyframes pulse { 50% { transform: scale(1.12); background: var(--accent); color: var(--bg); } }
+  @keyframes enter { from { opacity: 0; transform: translateX(var(--from)); } to { opacity: 1; transform: none; } }
+  @keyframes leave { to { opacity: 0; transform: translateX(var(--from)); } }
+  .icon {
+    flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent);
+  }
+  .icon svg { width: 18px; height: 18px; }
+  .body { min-width: 0; flex: 1; }
+  .head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .label { font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+  .project { font-size: 11px; color: var(--muted); background: var(--chip); padding: 1px 7px; border-radius: 99px;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .msg { margin-top: 3px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+  .hint { margin-top: 3px; font-size: 11px; color: var(--accent); }
+  .close { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: var(--muted); }
+  .close:hover { background: var(--chip); color: var(--fg); }
+  .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--accent); opacity: .7; transform-origin: left; }
+  .card:hover .bar { animation-play-state: paused; }
+  @keyframes shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="icon" id="icon"></div>
+  <div class="body">
+    <div class="head"><span class="label" id="label"></span><span class="project" id="project"></span></div>
+    <div class="msg" id="msg"></div>
+    <div class="hint" id="hint" hidden>Cliquer pour fermer</div>
+  </div>
+  <div class="close" title="Fermer"><svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg></div>
+  <div class="bar" id="bar" hidden></div>
+</div>
+<script>
+/*DATA*/
+const ICONS = {
+  question: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.8"/><path d="M12 17h.01"/>',
+  plan: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 13l2 2 4-4"/>',
+  permission: '<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M12 9v4"/><path d="M12 16h.01"/>',
+  idle: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  prompt_end: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.5 9.5"/>',
+  prompt_start: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5 3.5-5 3.5z"/>',
+  subagent_end: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4"/><path d="M9.5 13h.01M14.5 13h.01"/>',
+  session_start: '<path d="M12 3v8"/><path d="M7 6.5a7 7 0 1 0 10 0"/>',
+  session_end: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  notification: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+};
+const d = window.T;
+const card = document.getElementById('card');
+document.documentElement.style.setProperty('--accent', d.color);
+document.documentElement.style.setProperty('--from', d.left ? '-24px' : '24px');
+document.getElementById('icon').innerHTML =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+  (ICONS[d.kind] || ICONS.notification) + '</svg>';
+document.getElementById('label').textContent = d.label;
+const project = document.getElementById('project');
+if (d.project) project.textContent = d.project; else project.remove();
+document.getElementById('msg').textContent = d.message;
+if (d.blink) card.classList.add('blink');
+
+// Hauteur réelle du contenu, en pixels physiques, pour que Rust ajuste la fenêtre.
+// La largeur de la WebView peut encore changer juste après le chargement : on renvoie à chaque variation.
+let lastH = 0;
+new ResizeObserver(() => {
+  const h = Math.ceil(document.body.getBoundingClientRect().height * devicePixelRatio);
+  if (h !== lastH) { lastH = h; window.ipc.postMessage('h:' + h); }
+}).observe(document.body);
+
+let closing = false;
+function close() {
+  if (closing) return;
+  closing = true;
+  card.classList.add('leaving');
+  setTimeout(() => window.ipc.postMessage('close'), 200);
+}
+document.body.addEventListener('click', close);
+
+if (d.duration > 0) {
+  const bar = document.getElementById('bar');
+  bar.hidden = false;
+  bar.style.animation = `shrink ${d.duration}s linear forwards`;
+  bar.addEventListener('animationend', close);
+} else {
+  document.getElementById('hint').hidden = false;
+}
+</script>
+</body>
+</html>

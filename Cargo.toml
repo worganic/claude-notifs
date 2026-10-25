@@ -1,0 +1,27 @@
+[package]
+name = "claude-notifs"
+version = "0.1.0"
+edition = "2024"
+description = "Notifications Windows pour Claude Code"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+tao = "0.37.2"
+tiny_http = "0.12.0"
+tray-icon = "0.26.1"
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_SystemInformation",
+    "Win32_System_Console",
+    "Win32_Media_Audio",
+] }
+winreg = "0.56.0"
+wry = "0.57.1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
